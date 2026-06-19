@@ -1,0 +1,207 @@
+import { useCallback, useEffect, useReducer } from "react";
+import type { Task } from "../types/task";
+import { STORAGE_KEYS, localStorageService } from "../services/localStorageService";
+import {
+  applyTimeEntry,
+  buildTaskFromForm,
+  type TaskFilter,
+} from "./useTasks";
+import type { TaskFormValues } from "../utils/validation";
+
+type State = { tasks: Task[]; filter: TaskFilter };
+
+type Action =
+  | { type: "HYDRATE"; tasks: Task[] }
+  | { type: "SET_FILTER"; filter: Partial<TaskFilter> }
+  | { type: "RESET_FILTER" }
+  | { type: "ADD_TASK"; task: Task }
+  | { type: "UPDATE_TASK"; task: Task }
+  | { type: "DELETE_TASK"; id: string }
+  | { type: "REGISTER_TIME"; id: string; minutes: number }
+  | { type: "SET_STATUS"; id: string; status: Task["status"] }
+  | { type: "REORDER"; ids: string[] }
+  | { type: "CLEAR_CATEGORY"; categoryId: string }
+  | { type: "REPLACE_ALL"; tasks: Task[] }
+  | { type: "CLEAR_ALL" };
+
+const EMPTY_FILTER: TaskFilter = {
+  search: "",
+  categoryId: null,
+  status: null,
+  period: null,
+};
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "HYDRATE":
+      return { ...state, tasks: action.tasks };
+    case "SET_FILTER":
+      return { ...state, filter: { ...state.filter, ...action.filter } };
+    case "RESET_FILTER":
+      return { ...state, filter: EMPTY_FILTER };
+    case "ADD_TASK":
+      return { ...state, tasks: [action.task, ...state.tasks] };
+    case "UPDATE_TASK":
+      return {
+        ...state,
+        tasks: state.tasks.map((t) =>
+          t.id === action.task.id ? action.task : t,
+        ),
+      };
+    case "DELETE_TASK":
+      return { ...state, tasks: state.tasks.filter((t) => t.id !== action.id) };
+    case "REGISTER_TIME": {
+      return {
+        ...state,
+        tasks: state.tasks.map((t) =>
+          t.id === action.id ? applyTimeEntry(t, action.minutes) : t,
+        ),
+      };
+    }
+    case "SET_STATUS":
+      return {
+        ...state,
+        tasks: state.tasks.map((t) =>
+          t.id === action.id ? { ...t, status: action.status } : t,
+        ),
+      };
+    case "REORDER": {
+      const map = new Map(state.tasks.map((t) => [t.id, t]));
+      const reordered: Task[] = [];
+      for (const id of action.ids) {
+        const task = map.get(id);
+        if (task) {
+          reordered.push(task);
+          map.delete(id);
+        }
+      }
+      for (const remaining of map.values()) reordered.push(remaining);
+      return { ...state, tasks: reordered };
+    }
+    case "CLEAR_CATEGORY":
+      return {
+        ...state,
+        tasks: state.tasks.map((t) =>
+          t.categoryId === action.categoryId ? { ...t, categoryId: null } : t,
+        ),
+      };
+    case "REPLACE_ALL":
+      return { ...state, tasks: action.tasks };
+    case "CLEAR_ALL":
+      return { tasks: [], filter: EMPTY_FILTER };
+    default:
+      return state;
+  }
+}
+
+export interface TasksApi {
+  tasks: Task[];
+  filter: TaskFilter;
+  setFilter: (filter: Partial<TaskFilter>) => void;
+  resetFilter: () => void;
+  addTask: (values: TaskFormValues) => Task;
+  updateTask: (id: string, values: TaskFormValues) => void;
+  deleteTask: (id: string) => void;
+  registerTime: (id: string, minutes: number) => void;
+  setStatus: (id: string, status: Task["status"]) => void;
+  reorder: (ids: string[]) => void;
+  clearCategoryFromTasks: (categoryId: string) => number;
+  replaceAll: (tasks: Task[]) => void;
+  clearAll: () => void;
+  affectedByCategory: (categoryId: string) => number;
+}
+
+export function useTaskStore(): TasksApi {
+  const [state, dispatch] = useReducer(reducer, undefined, () => {
+    const tasks = localStorageService.get<Task[]>(STORAGE_KEYS.tasks, []);
+    return { tasks, filter: EMPTY_FILTER };
+  });
+
+  useEffect(() => {
+    localStorageService.set(STORAGE_KEYS.tasks, state.tasks);
+  }, [state.tasks]);
+
+  const setFilter = useCallback(
+    (filter: Partial<TaskFilter>) => dispatch({ type: "SET_FILTER", filter }),
+    [],
+  );
+  const resetFilter = useCallback(() => dispatch({ type: "RESET_FILTER" }), []);
+
+  const addTask = useCallback((values: TaskFormValues) => {
+    const task = buildTaskFromForm(values);
+    dispatch({ type: "ADD_TASK", task });
+    return task;
+  }, []);
+
+  const updateTask = useCallback(
+    (id: string, values: TaskFormValues) => {
+      const existing = state.tasks.find((t) => t.id === id);
+      if (!existing) return;
+      const task: Task = {
+        ...existing,
+        name: values.name.trim(),
+        categoryId: values.categoryId,
+        period: values.period,
+        targetMinutes: values.targetMinutes,
+      };
+      dispatch({ type: "UPDATE_TASK", task });
+    },
+    [state.tasks],
+  );
+
+  const deleteTask = useCallback((id: string) => {
+    dispatch({ type: "DELETE_TASK", id });
+  }, []);
+
+  const registerTime = useCallback((id: string, minutes: number) => {
+    dispatch({ type: "REGISTER_TIME", id, minutes });
+  }, []);
+
+  const setStatus = useCallback((id: string, status: Task["status"]) => {
+    dispatch({ type: "SET_STATUS", id, status });
+  }, []);
+
+  const reorder = useCallback((ids: string[]) => {
+    dispatch({ type: "REORDER", ids });
+  }, []);
+
+  const clearCategoryFromTasks = useCallback(
+    (categoryId: string) => {
+      const affected = state.tasks.filter(
+        (t) => t.categoryId === categoryId,
+      ).length;
+      dispatch({ type: "CLEAR_CATEGORY", categoryId });
+      return affected;
+    },
+    [state.tasks],
+  );
+
+  const replaceAll = useCallback((tasks: Task[]) => {
+    dispatch({ type: "REPLACE_ALL", tasks });
+  }, []);
+
+  const clearAll = useCallback(() => dispatch({ type: "CLEAR_ALL" }), []);
+
+  const affectedByCategory = useCallback(
+    (categoryId: string) =>
+      state.tasks.filter((t) => t.categoryId === categoryId).length,
+    [state.tasks],
+  );
+
+  return {
+    tasks: state.tasks,
+    filter: state.filter,
+    setFilter,
+    resetFilter,
+    addTask,
+    updateTask,
+    deleteTask,
+    registerTime,
+    setStatus,
+    reorder,
+    clearCategoryFromTasks,
+    replaceAll,
+    clearAll,
+    affectedByCategory,
+  };
+}
