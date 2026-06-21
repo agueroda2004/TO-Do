@@ -6,6 +6,7 @@ export interface TaskFilter {
   categoryId: string | null;
   status: TaskStatus | null;
   period: Period | null;
+  hideCompleted: boolean;
 }
 
 export const EMPTY_FILTER: TaskFilter = {
@@ -13,6 +14,7 @@ export const EMPTY_FILTER: TaskFilter = {
   categoryId: null,
   status: null,
   period: null,
+  hideCompleted: false,
 };
 
 export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {
@@ -22,6 +24,7 @@ export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {
     if (filter.categoryId && t.categoryId !== filter.categoryId) return false;
     if (filter.status && t.status !== filter.status) return false;
     if (filter.period && t.period !== filter.period) return false;
+    if (filter.hideCompleted && t.status === "completed") return false;
     return true;
   });
 }

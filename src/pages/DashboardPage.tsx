@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LayoutGrid, Tags } from "lucide-react";
+import { Eye, EyeOff, LayoutGrid, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { Header } from "../components/layout/Header";
 import { Button } from "../components/ui/Button";
@@ -158,7 +158,7 @@ export function DashboardPage() {
         />
 
         <section className="space-y-4">
-          <header className="flex items-center justify-between">
+          <header className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <LayoutGrid className="h-4 w-4 text-indigo-500" />
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
@@ -166,17 +166,63 @@ export function DashboardPage() {
               </h2>
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                 {filteredTasks.length}
+                {tasksCtx.filter.hideCompleted && stats.completed > 0 && (
+                  <span className="ml-1 text-slate-400 dark:text-slate-500">
+                    / {tasksCtx.tasks.length}
+                  </span>
+                )}
               </span>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setCategoriesOpen((v) => !v)}
-              leftIcon={<Tags className="h-4 w-4" />}
-              className="sm:hidden"
-            >
-              Categorías
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant={tasksCtx.filter.hideCompleted ? "primary" : "outline"}
+                onClick={() =>
+                  tasksCtx.setFilter({
+                    hideCompleted: !tasksCtx.filter.hideCompleted,
+                  })
+                }
+                leftIcon={
+                  tasksCtx.filter.hideCompleted ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )
+                }
+                aria-pressed={tasksCtx.filter.hideCompleted}
+                title={
+                  tasksCtx.filter.hideCompleted
+                    ? "Mostrar tareas terminadas"
+                    : "Ocultar tareas terminadas"
+                }
+              >
+                <span className="hidden sm:inline">
+                  {tasksCtx.filter.hideCompleted
+                    ? "Mostrar terminadas"
+                    : "Ocultar terminadas"}
+                </span>
+                {stats.completed > 0 && (
+                  <span
+                    className={
+                      tasksCtx.filter.hideCompleted
+                        ? "ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/20 px-1.5 text-[11px] font-semibold"
+                        : "ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-100 px-1.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                    }
+                  >
+                    {stats.completed}
+                  </span>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCategoriesOpen((v) => !v)}
+                leftIcon={<Tags className="h-4 w-4" />}
+                className="sm:hidden"
+              >
+                Categorías
+              </Button>
+            </div>
           </header>
 
           <AnimatePresence initial={false}>

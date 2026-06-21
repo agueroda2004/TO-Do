@@ -29,6 +29,7 @@ const EMPTY_FILTER: TaskFilter = {
   categoryId: null,
   status: null,
   period: null,
+  hideCompleted: false,
 };
 
 function reducer(state: State, action: Action): State {

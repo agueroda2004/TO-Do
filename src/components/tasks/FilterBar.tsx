@@ -32,7 +32,8 @@ export function FilterBar({
     filter.search.trim().length > 0 ||
     filter.categoryId !== null ||
     filter.status !== null ||
-    filter.period !== null;
+    filter.period !== null ||
+    filter.hideCompleted;
 
   return (
     <div
