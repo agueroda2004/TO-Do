@@ -10,6 +10,8 @@ import { FilterBar } from "../components/tasks/FilterBar";
 import { TaskList } from "../components/tasks/TaskList";
 import { TaskFormModal } from "../components/tasks/TaskFormModal";
 import { TimeTrackingModal } from "../components/tasks/TimeTrackingModal";
+import { ScheduleTaskModal } from "../components/tasks/ScheduleTaskModal";
+import { InboxSection } from "../components/tasks/InboxSection";
 import { CategoryManager } from "../components/categories/CategoryManager";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { useCategories } from "../context/CategoryContext";
@@ -27,10 +29,27 @@ export function DashboardPage() {
   const stats = useDashboardStats(tasksCtx.tasks);
   const filteredTasks = useFilteredTasks(tasksCtx.tasks, tasksCtx.filter);
 
+  const { inboxTasks, scheduledTasks } = useMemo(() => {
+    const inbox: Task[] = [];
+    const scheduled: Task[] = [];
+    for (const t of filteredTasks) {
+      if (t.scheduledFor === null) inbox.push(t);
+      else scheduled.push(t);
+    }
+    return { inboxTasks: inbox, scheduledTasks: scheduled };
+  }, [filteredTasks]);
+
+  const totalInbox = useMemo(
+    () => tasksCtx.tasks.filter((t) => t.scheduledFor === null).length,
+    [tasksCtx.tasks],
+  );
+
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskModalInbox, setTaskModalInbox] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [trackingTask, setTrackingTask] = useState<Task | null>(null);
   const [toDeleteTask, setToDeleteTask] = useState<Task | null>(null);
+  const [schedulingTask, setSchedulingTask] = useState<Task | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   const categoryById = useMemo(() => {
@@ -41,11 +60,19 @@ export function DashboardPage() {
 
   function openCreateTask() {
     setEditingTask(null);
+    setTaskModalInbox(false);
+    setTaskModalOpen(true);
+  }
+
+  function openCreateInboxTask() {
+    setEditingTask(null);
+    setTaskModalInbox(true);
     setTaskModalOpen(true);
   }
 
   function openEditTask(task: Task) {
     setEditingTask(task);
+    setTaskModalInbox(task.scheduledFor === null);
     setTaskModalOpen(true);
   }
 
@@ -53,12 +80,22 @@ export function DashboardPage() {
     if (editingTask) {
       tasksCtx.updateTask(editingTask.id, values);
       toast.success("Tarea actualizada");
+    } else if (values.scheduledFor === null) {
+      const task = tasksCtx.addTask(values);
+      toast.success("Guardado en la bandeja", { description: task.name });
     } else {
-      tasksCtx.addTask(values);
-      toast.success("Tarea creada", { description: values.name });
+      const task = tasksCtx.addTask(values);
+      toast.success("Tarea creada", { description: task.name });
     }
     setTaskModalOpen(false);
     setEditingTask(null);
+  }
+
+  function handleScheduleSubmit(values: TaskFormValues) {
+    if (!schedulingTask) return;
+    tasksCtx.updateTask(schedulingTask.id, values);
+    toast.success("Tarea programada", { description: schedulingTask.name });
+    setSchedulingTask(null);
   }
 
   function handleToggleStatus(task: Task) {
@@ -149,6 +186,29 @@ export function DashboardPage() {
 
         <WeeklyChart tasks={tasksCtx.tasks} />
 
+        <InboxSection
+          tasks={inboxTasks}
+          categories={categories}
+          onSchedule={setSchedulingTask}
+          onEdit={openEditTask}
+          onDelete={setToDeleteTask}
+          onCreate={openCreateInboxTask}
+          onToggleStatus={handleToggleStatus}
+        />
+
+        {totalInbox > 0 && (
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={openCreateInboxTask}
+              className="sm:hidden"
+            >
+              Añadir a la bandeja
+            </Button>
+          </div>
+        )}
+
         <FilterBar
           filter={tasksCtx.filter}
           categories={categories}
@@ -165,10 +225,10 @@ export function DashboardPage() {
                 Mis tareas
               </h2>
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                {filteredTasks.length}
+                {scheduledTasks.length}
                 {tasksCtx.filter.hideCompleted && stats.completed > 0 && (
                   <span className="ml-1 text-slate-400 dark:text-slate-500">
-                    / {tasksCtx.tasks.length}
+                    / {tasksCtx.tasks.length - totalInbox}
                   </span>
                 )}
               </span>
@@ -248,7 +308,7 @@ export function DashboardPage() {
           </AnimatePresence>
 
           <TaskList
-            tasks={filteredTasks}
+            tasks={scheduledTasks}
             categories={categories}
             onEdit={openEditTask}
             onDelete={setToDeleteTask}
@@ -261,15 +321,24 @@ export function DashboardPage() {
       </main>
 
       <TaskFormModal
-        key={editingTask?.id ?? "new-task"}
+        key={editingTask?.id ?? taskModalInbox ? "new-inbox" : "new-scheduled"}
         open={taskModalOpen}
         task={editingTask}
         categories={categories}
+        defaultInbox={taskModalInbox}
         onClose={() => {
           setTaskModalOpen(false);
           setEditingTask(null);
         }}
         onSubmit={handleTaskSubmit}
+      />
+
+      <ScheduleTaskModal
+        key={schedulingTask?.id ?? "no-schedule"}
+        open={schedulingTask !== null}
+        task={schedulingTask}
+        onClose={() => setSchedulingTask(null)}
+        onSubmit={handleScheduleSubmit}
       />
 
       <TimeTrackingModal

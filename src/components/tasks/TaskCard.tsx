@@ -6,7 +6,9 @@ import {
   CheckCircle2,
   CircleDashed,
   Clock3,
+  Flag,
   GripVertical,
+  Inbox,
   Pencil,
   PlayCircle,
   Tag,
@@ -22,10 +24,12 @@ import { ProgressBar } from "../ui/ProgressBar";
 import { cn } from "../../utils/cn";
 import {
   PERIOD_LABELS,
+  PRIORITY_BADGE_STYLES,
+  PRIORITY_LABELS,
   STATUS_COLORS,
   STATUS_LABELS,
 } from "../../utils/validation";
-import { formatDate, formatTime } from "../../utils/date";
+import { formatTime, formatScheduledFor } from "../../utils/date";
 import { progressPercent, remainingMinutes } from "../../utils/stats";
 
 interface TaskCardProps {
@@ -62,6 +66,8 @@ export function TaskCard({
     transition,
   };
 
+  const isInbox = task.scheduledFor === null;
+  const hasTimeTracking = !isInbox && task.targetMinutes > 0;
   const percent = progressPercent(task);
   const remaining = remainingMinutes(task);
   const isCompleted = task.status === "completed";
@@ -78,8 +84,10 @@ export function TaskCard({
       style={style}
       layout
       className={cn(
-        "group relative flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md",
-        "dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500/50",
+        "group relative flex flex-col gap-4 overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition-all hover:shadow-md",
+        isInbox
+          ? "border-dashed border-slate-300 hover:border-indigo-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-indigo-500/50"
+          : "border-slate-200 hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500/50",
         isCompleted && "opacity-90",
         isDragging &&
           "z-10 rotate-1 shadow-xl ring-2 ring-indigo-300 dark:ring-indigo-500/50",
@@ -88,6 +96,15 @@ export function TaskCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
     >
+      <div
+        aria-hidden
+        className={cn(
+          "absolute inset-y-0 left-0 w-1",
+          task.priority === "high" && "bg-rose-500",
+          task.priority === "medium" && "bg-amber-500",
+          task.priority === "low" && "bg-slate-300 dark:bg-slate-600",
+        )}
+      />
       <div className="flex items-start gap-3">
         {draggable && (
           <button
@@ -160,43 +177,61 @@ export function TaskCard({
               )}
               {STATUS_LABELS[task.status]}
             </Badge>
-            <Badge variant="outline">
-              <Clock3 className="h-3 w-3" />
-              {PERIOD_LABELS[task.period]}
+            <Badge className={PRIORITY_BADGE_STYLES[task.priority]}>
+              <Flag className="h-3 w-3" />
+              {PRIORITY_LABELS[task.priority]}
             </Badge>
+            {isInbox ? (
+              <Badge
+                variant="outline"
+                className="border-indigo-200 bg-indigo-50/50 text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300"
+              >
+                <Inbox className="h-3 w-3" />
+                Bandeja
+              </Badge>
+            ) : (
+              <Badge variant="outline">
+                <Clock3 className="h-3 w-3" />
+                {task.period ? PERIOD_LABELS[task.period] : "Sin periodo"}
+              </Badge>
+            )}
+            {!isInbox && task.scheduledFor && (
+              <Badge variant="outline">
+                <Calendar className="h-3 w-3" />
+                {formatScheduledFor(task.scheduledFor)}
+              </Badge>
+            )}
             {category && (
               <Badge variant="outline">
                 <Tag className="h-3 w-3" />
                 {category.name}
               </Badge>
             )}
-            <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
-              <Calendar className="h-3 w-3" />
-              {formatDate(task.createdAt)}
-            </span>
           </div>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <ProgressBar
-          value={percent}
-          label={`${task.workedMinutes} / ${task.targetMinutes} minutos · ${Math.round(percent)}%`}
-          tone={isCompleted ? "success" : "brand"}
-          showValue
-        />
-        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span className="inline-flex items-center gap-1">
-            <Timer className="h-3 w-3" />
-            {isCompleted
-              ? `Meta alcanzada · ${task.workedMinutes} min`
-              : `${remaining} min restantes`}
-          </span>
-          <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
-            Actualizado {formatTime(new Date(task.createdAt))}
-          </span>
+      {hasTimeTracking && (
+        <div className="space-y-2">
+          <ProgressBar
+            value={percent}
+            label={`${task.workedMinutes} / ${task.targetMinutes} minutos · ${Math.round(percent)}%`}
+            tone={isCompleted ? "success" : "brand"}
+            showValue
+          />
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1">
+              <Timer className="h-3 w-3" />
+              {isCompleted
+                ? `Meta alcanzada · ${task.workedMinutes} min`
+                : `${remaining} min restantes`}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+              Actualizado {formatTime(new Date(task.createdAt))}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
         <Button
@@ -215,15 +250,17 @@ export function TaskCard({
         >
           {nextStatusLabel}
         </Button>
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={() => onTrackTime(task)}
-          leftIcon={<Timer className="h-4 w-4" />}
-          disabled={isCompleted}
-        >
-          Registrar tiempo
-        </Button>
+        {hasTimeTracking && (
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => onTrackTime(task)}
+            leftIcon={<Timer className="h-4 w-4" />}
+            disabled={isCompleted}
+          >
+            Registrar tiempo
+          </Button>
+        )}
       </div>
     </motion.article>
   );

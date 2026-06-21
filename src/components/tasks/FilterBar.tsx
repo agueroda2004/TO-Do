@@ -1,9 +1,11 @@
 import { Search, X } from "lucide-react";
 import type { Category } from "../../types/category";
-import type { Period, TaskStatus } from "../../types/task";
+import type { Period, Priority, TaskStatus } from "../../types/task";
 import {
   PERIODS,
   PERIOD_LABELS,
+  PRIORITIES,
+  PRIORITY_LABELS,
   STATUS_LABELS,
   TASK_STATUSES,
 } from "../../utils/validation";
@@ -33,6 +35,7 @@ export function FilterBar({
     filter.categoryId !== null ||
     filter.status !== null ||
     filter.period !== null ||
+    filter.priority !== null ||
     filter.hideCompleted;
 
   return (
@@ -64,7 +67,7 @@ export function FilterBar({
             }
           />
         </div>
-        <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <CustomDropdown
             label="Categoría"
             value={filter.categoryId ?? ""}
@@ -99,6 +102,20 @@ export function FilterBar({
             options={[
               { value: "", label: "Todos" },
               ...PERIODS.map((p) => ({ value: p, label: PERIOD_LABELS[p] })),
+            ]}
+          />
+          <CustomDropdown
+            label="Prioridad"
+            value={filter.priority ?? ""}
+            onChange={(v) =>
+              onChange({ priority: v === "" ? null : (v as Priority) })
+            }
+            options={[
+              { value: "", label: "Todas" },
+              ...PRIORITIES.map((p) => ({
+                value: p,
+                label: PRIORITY_LABELS[p],
+              })),
             ]}
           />
         </div>

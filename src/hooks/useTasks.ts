@@ -1,4 +1,4 @@
-import type { Period, Task, TaskStatus } from "../types/task";
+import type { Period, Priority, Task, TaskStatus } from "../types/task";
 import type { TaskFormValues } from "../utils/validation";
 
 export interface TaskFilter {
@@ -6,6 +6,7 @@ export interface TaskFilter {
   categoryId: string | null;
   status: TaskStatus | null;
   period: Period | null;
+  priority: Priority | null;
   hideCompleted: boolean;
 }
 
@@ -14,6 +15,7 @@ export const EMPTY_FILTER: TaskFilter = {
   categoryId: null,
   status: null,
   period: null,
+  priority: null,
   hideCompleted: false,
 };
 
@@ -24,6 +26,7 @@ export function filterTasks(tasks: Task[], filter: TaskFilter): Task[] {
     if (filter.categoryId && t.categoryId !== filter.categoryId) return false;
     if (filter.status && t.status !== filter.status) return false;
     if (filter.period && t.period !== filter.period) return false;
+    if (filter.priority && t.priority !== filter.priority) return false;
     if (filter.hideCompleted && t.status === "completed") return false;
     return true;
   });
@@ -34,24 +37,29 @@ export function buildTaskFromForm(
   existing?: Task,
 ): Task {
   const now = new Date().toISOString();
+  const isInbox = values.scheduledFor === null;
   if (existing) {
     return {
       ...existing,
       name: values.name.trim(),
       categoryId: values.categoryId,
-      period: values.period,
-      targetMinutes: values.targetMinutes,
+      period: isInbox ? null : values.period,
+      targetMinutes: isInbox ? 0 : values.targetMinutes,
+      scheduledFor: values.scheduledFor,
+      priority: values.priority,
     };
   }
   return {
     id: `task_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     name: values.name.trim(),
     categoryId: values.categoryId,
-    period: values.period,
-    targetMinutes: values.targetMinutes,
+    period: isInbox ? null : values.period,
+    targetMinutes: isInbox ? 0 : values.targetMinutes,
     workedMinutes: 0,
     status: "pending",
     createdAt: now,
+    scheduledFor: values.scheduledFor,
+    priority: values.priority,
   };
 }
 

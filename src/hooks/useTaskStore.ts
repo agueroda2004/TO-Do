@@ -6,7 +6,7 @@ import {
   buildTaskFromForm,
   type TaskFilter,
 } from "./useTasks";
-import type { TaskFormValues } from "../utils/validation";
+import { isTask, type TaskFormValues } from "../utils/validation";
 
 type State = { tasks: Task[]; filter: TaskFilter };
 
@@ -29,6 +29,7 @@ const EMPTY_FILTER: TaskFilter = {
   categoryId: null,
   status: null,
   period: null,
+  priority: null,
   hideCompleted: false,
 };
 
@@ -112,9 +113,37 @@ export interface TasksApi {
   affectedByCategory: (categoryId: string) => number;
 }
 
+function migrateTasks(tasks: unknown[]): Task[] {
+  const today = new Date().toISOString().slice(0, 10);
+  let mutated = false;
+  const migrated: Task[] = [];
+  for (const raw of tasks) {
+    if (!isTask(raw)) continue;
+    const t = raw as Task & {
+      scheduledFor?: string | null;
+      priority?: string;
+    };
+    let updated = t;
+    if (!("scheduledFor" in t) || t.scheduledFor === undefined) {
+      updated = { ...updated, scheduledFor: today };
+      mutated = true;
+    }
+    if (!("priority" in t) || t.priority === undefined) {
+      updated = { ...updated, priority: "medium" };
+      mutated = true;
+    }
+    migrated.push(updated);
+  }
+  if (mutated) {
+    localStorageService.set(STORAGE_KEYS.tasks, migrated);
+  }
+  return migrated;
+}
+
 export function useTaskStore(): TasksApi {
   const [state, dispatch] = useReducer(reducer, undefined, () => {
-    const tasks = localStorageService.get<Task[]>(STORAGE_KEYS.tasks, []);
+    const raw = localStorageService.get<unknown[]>(STORAGE_KEYS.tasks, []);
+    const tasks = migrateTasks(raw);
     return { tasks, filter: EMPTY_FILTER };
   });
 
@@ -138,12 +167,15 @@ export function useTaskStore(): TasksApi {
     (id: string, values: TaskFormValues) => {
       const existing = state.tasks.find((t) => t.id === id);
       if (!existing) return;
+      const isInbox = values.scheduledFor === null;
       const task: Task = {
         ...existing,
         name: values.name.trim(),
         categoryId: values.categoryId,
-        period: values.period,
-        targetMinutes: values.targetMinutes,
+        period: isInbox ? null : values.period,
+        targetMinutes: isInbox ? 0 : values.targetMinutes,
+        scheduledFor: values.scheduledFor,
+        priority: values.priority,
       };
       dispatch({ type: "UPDATE_TASK", task });
     },
