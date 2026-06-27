@@ -4,8 +4,6 @@ import { Eye, EyeOff, LayoutGrid, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { Header } from "../components/layout/Header";
 import { Button } from "../components/ui/Button";
-import { DashboardStatsView } from "../components/dashboard/DashboardStats";
-import { WeeklyChart } from "../components/dashboard/WeeklyChart";
 import { FilterBar } from "../components/tasks/FilterBar";
 import { TaskList } from "../components/tasks/TaskList";
 import { TaskFormModal } from "../components/tasks/TaskFormModal";
@@ -23,8 +21,14 @@ import type { TaskFormValues } from "../utils/validation";
 
 export function DashboardPage() {
   const tasksCtx = useTasksContext();
-  const { categories, addCategory, updateCategory, deleteCategory, existsByName, replaceAll } =
-    useCategories();
+  const {
+    categories,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    existsByName,
+    replaceAll,
+  } = useCategories();
 
   const stats = useDashboardStats(tasksCtx.tasks);
   const filteredTasks = useFilteredTasks(tasksCtx.tasks, tasksCtx.filter);
@@ -135,7 +139,9 @@ export function DashboardPage() {
 
   function handleCreateCategory(name: string) {
     if (existsByName(name)) {
-      toast.error("Categoría duplicada", { description: `"${name}" ya existe.` });
+      toast.error("Categoría duplicada", {
+        description: `"${name}" ya existe.`,
+      });
       return;
     }
     addCategory(name);
@@ -144,7 +150,9 @@ export function DashboardPage() {
 
   function handleUpdateCategory(id: string, name: string) {
     if (existsByName(name, id)) {
-      toast.error("Categoría duplicada", { description: `"${name}" ya existe.` });
+      toast.error("Categoría duplicada", {
+        description: `"${name}" ya existe.`,
+      });
       return;
     }
     updateCategory(id, name);
@@ -182,9 +190,7 @@ export function DashboardPage() {
       />
 
       <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        <DashboardStatsView stats={stats} />
-
-        <WeeklyChart tasks={tasksCtx.tasks} />
+        {/* <DashboardStatsView stats={stats} /> */}
 
         <InboxSection
           tasks={inboxTasks}
@@ -321,7 +327,9 @@ export function DashboardPage() {
       </main>
 
       <TaskFormModal
-        key={editingTask?.id ?? taskModalInbox ? "new-inbox" : "new-scheduled"}
+        key={
+          (editingTask?.id ?? taskModalInbox) ? "new-inbox" : "new-scheduled"
+        }
         open={taskModalOpen}
         task={editingTask}
         categories={categories}
